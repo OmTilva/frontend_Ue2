@@ -1,107 +1,38 @@
-// import React, { useState } from "react";
-// import "../../App.css";
-// import AssignAdminModal from "./AssignAdminModal";
-
-// export default function OrgCard() {
-//   const [assignAdmin, setAssignAdmin] = useState("");
-
-//   return (
-//     <div className="orgCard">
-//       {assignAdmin && (
-//         <AssignAdminModal type={"Organisation"} setModalView={setAssignAdmin} />
-//       )}
-//       <h3 className="orgCardTitle">Organisation Name</h3>
-//       <div className="orgCardDetails">
-//         <div className="orgCardRow">
-//           <span className="orgLabel">Email:</span>
-//           <span className="orgValue">org@example.com</span>
-//         </div>
-//         <div className="orgCardRow">
-//           <span className="orgLabel">Address:</span>
-//           <span className="orgValue">123 Main Street</span>
-//         </div>
-//         <div className="orgCardRow">
-//           <span className="orgLabel">City:</span>
-//           <span className="orgValue">New York</span>
-//         </div>
-//         <div className="orgCardRow">
-//           <span className="orgLabel">State:</span>
-//           <span className="orgValue">NY</span>
-//         </div>
-//         <div className="orgCardRow">
-//           <span className="orgLabel">PoC Name:</span>
-//           <span className="orgValue">Jane Doe</span>
-//         </div>
-//         <div className="orgCardRow">
-//           <span className="orgLabel">Contact No:</span>
-//           <span className="orgValue">9876543210</span>
-//         </div>
-//         <div className="orgCardRow">
-//           <span className="orgLabel">Admin:</span>
-//           <span className="orgValue">a@x.com</span>
-//         </div>
-//         <div className="orgCardRow">
-//           <span className="orgLabel">Members Domain:</span>
-//           <span className="orgValue">@orgname.ac.in</span>
-//         </div>
-//       </div>
-
-//       <div className="orgCardActions">
-//         <button className="orgBtn edit">Edit</button>
-//         <button
-//           className="orgBtn assign"
-//           onClick={() => setAssignAdmin("Organisation Id")}
-//         >
-//           Admins
-//         </button>
-//         <button className="orgBtn delete">Delete</button>
-//       </div>
-//     </div>
-//   );
-// }
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "../../App.css";
 import AssignAdminModal from "./AssignAdminModal";
 
 export default function OrgCard({ org, refreshOrganizations }) {
   const [assignAdmin, setAssignAdmin] = useState(false);
+  const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  const handleEdit = async () => {
-    const updatedData = {
-      name: org.name,
-      email: org.email,
-      type: org.type,
-      address: org.address,
-      city: org.city,
-      state: org.state,
-      poc: org.poc,
-      contact: org.contact,
-      memberDomain: org.memberDomain,
-    };
+  const handleEdit = () => {
+    // Refresh the page and redirect to /sadminorg with the organization's data
+    window.location.href = `/sadminorg?action=Update&orgId=${org._id}`;
+  };
 
+  const handleFetchAdmins = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `http://localhost:5000/org/${org._id}/edit`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify(updatedData),
-        }
-      );
+      const response = await fetch(`http://localhost:5000/org/${org._id}`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message || "Failed to edit organization");
+        throw new Error(data.message || "Failed to fetch admins");
       }
 
-      alert("Organization updated successfully!");
-      refreshOrganizations(); // Refresh the list of organizations
+      setAdmins(data.organization.admins || []);
+      setAssignAdmin(true); // Open the modal
     } catch (error) {
       setError(error.message);
     } finally {
@@ -141,7 +72,9 @@ export default function OrgCard({ org, refreshOrganizations }) {
         <AssignAdminModal
           type={"Organisation"}
           setModalView={setAssignAdmin}
-          onAssign={refreshOrganizations}
+          admins={admins}
+          org={org}
+          refreshOrganizations={refreshOrganizations}
         />
       )}
       <h3 className="orgCardTitle">{org.name}</h3>
@@ -188,10 +121,10 @@ export default function OrgCard({ org, refreshOrganizations }) {
         </button>
         <button
           className="orgBtn assign"
-          onClick={() => setAssignAdmin(true)}
+          onClick={handleFetchAdmins}
           disabled={loading}
         >
-          {loading ? "Assigning..." : "Admins"}
+          {loading ? "Loading..." : "Admins"}
         </button>
         <button
           className="orgBtn delete"

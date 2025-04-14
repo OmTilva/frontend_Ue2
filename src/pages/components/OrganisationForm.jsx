@@ -1,52 +1,52 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import "../../App.css";
 
-export default function OrganisationForm({ type }) {
+export default function OrganisationForm({ type, orgData }) {
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    type: "",
-    address: "",
-    city: "",
-    state: "",
-    poc: "",
-    contact: "",
-    memberDomain: "",
-    adminId: "",
+    name: orgData?.name || "",
+    email: orgData?.email || "",
+    type: orgData?.type || "",
+    address: orgData?.address || "",
+    city: orgData?.city || "",
+    state: orgData?.state || "",
+    poc: orgData?.poc || "",
+    contact: orgData?.contact || "",
+    memberDomain: orgData?.memberDomain || "",
+    adminId: orgData?.adminId || "",
   });
 
+  const [approvedTypes, setApprovedTypes] = useState([]); // State to store approved types
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Fetch the current admin's ID
-  useEffect(() => {
-    const fetchAdminId = async () => {
-      try {
-        const response = await fetch("http://localhost:5000/auth/current", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
+  // Fetch approved types from the backend
+  const fetchApprovedTypes = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/type", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || "Failed to fetch admin details");
-        }
-
-        setFormData((prev) => ({
-          ...prev,
-          adminId: data._id, // Set the admin ID in the form data
-        }));
-      } catch (error) {
-        setError("Failed to fetch admin details");
-        console.error("Error fetching admin ID:", error);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to fetch approved types");
       }
-    };
 
-    fetchAdminId();
+      // Filter types with status "approved"
+      const approved = data.types.filter((type) => type.status === "approved");
+      setApprovedTypes(approved);
+    } catch (error) {
+      console.error("Error fetching approved types:", error);
+      setError("Failed to fetch approved types");
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovedTypes();
   }, []);
 
   const handleChange = (e) => {
@@ -63,8 +63,15 @@ export default function OrganisationForm({ type }) {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:5000/org/create", {
-        method: "POST",
+      const endpoint =
+        type === "Create"
+          ? "http://localhost:5000/org/create"
+          : `http://localhost:5000/org/${orgData._id}/edit`;
+
+      const method = type === "Create" ? "POST" : "PATCH";
+
+      const response = await fetch(endpoint, {
+        method,
         headers: {
           "Content-Type": "application/json",
         },
@@ -75,10 +82,15 @@ export default function OrganisationForm({ type }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Failed to create organization");
+        throw new Error(data.message || "Failed to process organization");
       }
 
-      alert("Organization created successfully!");
+      alert(
+        type === "Create"
+          ? "Organization created successfully!"
+          : "Organization updated successfully!"
+      );
+
       setFormData({
         name: "",
         email: "",
@@ -89,11 +101,13 @@ export default function OrganisationForm({ type }) {
         poc: "",
         contact: "",
         memberDomain: "",
-        adminId: formData.adminId, // Retain the admin ID
+        adminId: "",
       });
     } catch (error) {
-      setError(error.message || "An error occurred during organization creation");
-      console.error("Error creating organization:", error);
+      setError(
+        error.message || "An error occurred during organization processing"
+      );
+      console.error("Error processing organization:", error);
     } finally {
       setLoading(false);
     }
@@ -130,15 +144,13 @@ export default function OrganisationForm({ type }) {
             </div>
             <div className="vInputBox flexItem flex column">
               <p className="inputLabel">Type</p>
-              <select
-                name="type"
-                value={formData.type}
-                onChange={handleChange}
-              >
+              <select name="type" value={formData.type} onChange={handleChange}>
                 <option value="">Select Type</option>
-                <option value="Type 1">Type 1</option>
-                <option value="Type 2">Type 2</option>
-                <option value="Type 3">Type 3</option>
+                {approvedTypes.map((type) => (
+                  <option key={type._id} value={type.name}>
+                    {type.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -216,7 +228,11 @@ export default function OrganisationForm({ type }) {
             className="btn transparentBtn"
             disabled={loading}
           >
-            {loading ? "Submitting..." : type === "Create" ? "Submit" : "Update"}
+            {loading
+              ? "Submitting..."
+              : type === "Create"
+              ? "Submit"
+              : "Update"}
           </button>
         </form>
       </div>

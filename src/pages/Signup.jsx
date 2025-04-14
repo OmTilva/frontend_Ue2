@@ -64,7 +64,7 @@ export default function Signup() {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:5000/auth/signup", {
+      const response = await fetch("auth/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

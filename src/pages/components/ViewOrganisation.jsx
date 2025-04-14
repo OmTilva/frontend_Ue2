@@ -3,8 +3,10 @@ import OrgCard from "./OrgCard";
 
 export default function ViewOrganisation() {
   const [organizations, setOrganizations] = useState([]);
+  const [filteredOrganizations, setFilteredOrganizations] = useState([]);
   const [selectedOrg, setSelectedOrg] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -27,6 +29,7 @@ export default function ViewOrganisation() {
         }
 
         setOrganizations(data.organizations);
+        setFilteredOrganizations(data.organizations); // Initialize filtered organizations
       } catch (error) {
         setError(error.message);
       }
@@ -34,6 +37,17 @@ export default function ViewOrganisation() {
 
     fetchOrganizations();
   }, []);
+
+  // Handle search functionality
+  const handleSearch = (e) => {
+    const term = e.target.value.toLowerCase();
+    setSearchTerm(term);
+
+    const filtered = organizations.filter((org) =>
+      org.name.toLowerCase().includes(term)
+    );
+    setFilteredOrganizations(filtered);
+  };
 
   const handleAssignAdmin = async () => {
     if (!selectedOrg || !adminEmail) {
@@ -100,8 +114,15 @@ export default function ViewOrganisation() {
           </button>
         </div>
         <div className="flex row gap-8">
-          <input type="text" placeholder="Search Organisation" />
-          <button className="btn whiteBtn">Search</button>
+          <input
+            type="text"
+            placeholder="Search Organisation"
+            value={searchTerm}
+            onChange={handleSearch}
+          />
+          <button className="btn whiteBtn" onClick={handleSearch}>
+            Search
+          </button>
         </div>
       </div>
 
@@ -109,7 +130,7 @@ export default function ViewOrganisation() {
       {success && <p className="successMsg">{success}</p>}
 
       <div className="flex row fxwrap gap-8">
-        {organizations.map((org) => (
+        {filteredOrganizations.map((org) => (
           <OrgCard key={org._id} org={org} />
         ))}
       </div>
