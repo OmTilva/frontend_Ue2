@@ -1,120 +1,72 @@
-// import React from 'react'
-// import '../../App.css'
-
-// export default function DepartmentForm({type}) {
-//   return (
-//     <div id="organisation" className="section flex row fb1 centerb">
-//         <div className="borderBox flex column centerb gap-12">
-//         <p className="sectionHeading">{type} Deaprtment</p>
-
-//         {/* Name & Email */}
-//         <div className="flexRowSplit">
-//             <div className="vInputBox flexItem flex column">
-//             <p className="inputLabel">Name</p>
-//             <input type="text" placeholder="e.g John Doe" />
-//             </div>
-//             <div className="vInputBox flexItem flex column">
-//             <p className="inputLabel">Type</p>
-//             <select>
-//                 <option>Select Type</option>
-//                 <option>Type 1</option>
-//                 <option>Type 2</option>
-//                 <option>Type 3</option>
-//             </select>
-//             </div>
-//         </div>
-//         <div className="flexRowSplit">
-//             <div className="vInputBox flexItem flex column">
-//                 <p className="inputLabel">Description</p>
-//                 <textarea type="text" placeholder="Description of the department" />
-//             </div>
-//         </div>
-//         <button className="btn transparentBtn">
-//             {type === 'Create' ? 'Submit' : 'Update'}
-//         </button>
-//     </div>
-//   </div>
-//   )
-// }
 import React, { useState, useEffect } from "react";
 import "../../App.css";
 
-export default function DepartmentForm({ type }) {
+export default function DepartmentForm({ department, onClose }) {
   const [formData, setFormData] = useState({
-    name: "",
-    type: "",
-    description: "",
-    adminId: "",
-    orgId: "",
+    name: department?.name || "",
+    type: department?.type || "",
+    description: department?.description || "",
+    adminId: "", // To be fetched
+    orgId: "", // To be fetched
   });
-
-  const [organizations, setOrganizations] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [approvedTypes, setApprovedTypes] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  // Fetch current user's organizations and all users
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch current user
-        const userResponse = await fetch("http://localhost:5000/auth/current", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
+  // Fetch approved types
+  const fetchApprovedTypes = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/type", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-        const currentUser = await userResponse.json();
-        if (!userResponse.ok) {
-          throw new Error(
-            currentUser.message || "Failed to fetch current user"
-          );
-        }
-
-        // Fetch organizations where the current user is an admin
-        const orgResponse = await fetch("http://localhost:5000/org/all", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        const orgData = await orgResponse.json();
-        if (!orgResponse.ok) {
-          throw new Error(orgData.message || "Failed to fetch organizations");
-        }
-
-        // Filter organizations where the current user is an admin
-        const filteredOrganizations = orgData.organizations.filter((org) =>
-          org.admins.includes(currentUser._id)
-        );
-        setOrganizations(filteredOrganizations);
-
-        // Fetch all users
-        const usersResponse = await fetch("http://localhost:5000/user/all", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        const usersData = await usersResponse.json();
-        if (!usersResponse.ok) {
-          throw new Error(usersData.message || "Failed to fetch users");
-        }
-        setUsers(usersData.users);
-      } catch (error) {
-        setError(error.message);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to fetch approved types");
       }
-    };
 
-    fetchData();
+      const approved = data.types.filter((type) => type.status === "approved");
+      setApprovedTypes(approved);
+    } catch (error) {
+      console.error("Error fetching approved types:", error);
+      setError("Failed to fetch approved types");
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovedTypes();
+    fetchAdminAndOrg();
   }, []);
+
+  const fetchAdminAndOrg = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/auth/current", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to fetch user info");
+      }
+
+      setFormData((prevData) => ({
+        ...prevData,
+        adminId: data._id,
+        orgId: data.organizations[0], // Assuming orgId is part of the user object
+      }));
+    } catch (err) {
+      console.error("Failed to fetch admin and org info:", err);
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -132,12 +84,10 @@ export default function DepartmentForm({ type }) {
     setSuccess("");
 
     try {
-      const endpoint =
-        type === "Create"
-          ? "http://localhost:5000/department/create"
-          : `http://localhost:5000/department/${formData.deptId}/edit`;
-
-      const method = type === "Create" ? "POST" : "PATCH";
+      const endpoint = department
+        ? `http://localhost:5000/department/${department._id}/edit`
+        : "http://localhost:5000/department/create";
+      const method = department ? "PATCH" : "POST";
 
       const response = await fetch(endpoint, {
         method,
@@ -150,38 +100,36 @@ export default function DepartmentForm({ type }) {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message || "Failed to process department");
+        throw new Error(data.message || "Failed to save department");
       }
 
       setSuccess(
-        type === "Create"
-          ? "Department created successfully!"
-          : "Department updated successfully!"
+        department
+          ? "Department updated successfully!"
+          : "Department created successfully!"
       );
-      setFormData({
-        name: "",
-        type: "",
-        description: "",
-        adminId: "",
-        orgId: "",
-      });
+      onClose();
     } catch (error) {
-      setError(error.message);
+      console.error("Error saving department:", error);
+      setError(
+        error.message || "An error occurred while saving the department"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div id="organisation" className="section flex row fb1 centerb">
+    <div id="department" className="section flex row fb1 centerb">
       <div className="borderBox flex column centerb gap-12">
-        <p className="sectionHeading">{type} Department</p>
+        <p className="sectionHeading">
+          {department ? "Update Department" : "Create Department"}
+        </p>
 
-        {error && <p className="error-message">{error}</p>}
-        {success && <p className="success-message">{success}</p>}
+        {error && <div className="error-message">{error}</div>}
+        {success && <div className="success-message">{success}</div>}
 
         <form onSubmit={handleSubmit}>
-          {/* Name & Type */}
           <div className="flexRowSplit">
             <div className="vInputBox flexItem flex column">
               <p className="inputLabel">Name</p>
@@ -190,7 +138,7 @@ export default function DepartmentForm({ type }) {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="e.g John Doe"
+                placeholder="e.g Department Name"
                 required
               />
             </div>
@@ -203,14 +151,14 @@ export default function DepartmentForm({ type }) {
                 required
               >
                 <option value="">Select Type</option>
-                <option value="Type 1">Type 1</option>
-                <option value="Type 2">Type 2</option>
-                <option value="Type 3">Type 3</option>
+                {approvedTypes.map((type) => (
+                  <option key={type._id} value={type.name}>
+                    {type.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
-
-          {/* Description */}
           <div className="flexRowSplit">
             <div className="vInputBox flexItem flex column">
               <p className="inputLabel">Description</p>
@@ -218,59 +166,28 @@ export default function DepartmentForm({ type }) {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                placeholder="Description of the department"
+                placeholder="e.g Description of the department"
+                required
               />
             </div>
           </div>
-
-          {/* Admin & Organization */}
-          <div className="flexRowSplit">
-            <div className="vInputBox flexItem flex column">
-              <p className="inputLabel">Admin</p>
-              <select
-                name="adminId"
-                value={formData.adminId}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select Admin</option>
-                {users.map((user) => (
-                  <option key={user._id} value={user._id}>
-                    {user.name} ({user.email})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="vInputBox flexItem flex column">
-              <p className="inputLabel">Organization</p>
-              <select
-                name="orgId"
-                value={formData.orgId}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select Organization</option>
-                {organizations.map((org) => (
-                  <option key={org._id} value={org._id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           <button
-            className="btn transparentBtn"
             type="submit"
+            className="btn transparentBtn"
             disabled={loading}
           >
             {loading
-              ? type === "Create"
-                ? "Submitting..."
-                : "Updating..."
-              : type === "Create"
-              ? "Submit"
-              : "Update"}
+              ? "Submitting..."
+              : department
+              ? "Update Department"
+              : "Create Department"}
+          </button>
+          <button
+            type="button"
+            className="btn transparentBtn"
+            onClick={onClose}
+          >
+            Cancel
           </button>
         </form>
       </div>
